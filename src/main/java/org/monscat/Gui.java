@@ -92,14 +92,40 @@ public class Gui {
         subscribedTopicPanel.add(subscribedTopicLabel);
         subscribedTopicPanel.add(subscribedTopicField);
 
+        subscribedTopicField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                textChanged();
+            }
+
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                textChanged();
+            }
+
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                textChanged();
+            }
+
+            private void textChanged() {
+                // This method is called whenever the text changes
+                String text = subscribedTopicField.getText();
+                if(subscribeList.contains(text)) {
+                    subscribeButton.setEnabled(false);
+                } else {
+                    subscribeButton.setEnabled(true);
+                }
+            }
+        });
+
         subscribedTopicField.setEnabled(false);
         subscribeButton.setEnabled(false);
         subscribeButton.addActionListener(e -> {
             String topic = subscribedTopicField.getText();
             if (mqttUtil.subscribeTo(topic)) {
                 subscribeList.addElement(topic);
+                subscribeButton.setEnabled(false);
                 textArea.append("Subscribed to " + topic + "\n");
             } else {
+                subscribeButton.setEnabled(true);
                 textArea.append("Failed to subscribe to " + topic + "\n");
             }
         });
