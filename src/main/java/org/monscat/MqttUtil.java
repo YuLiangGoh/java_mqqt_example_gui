@@ -3,26 +3,38 @@ package org.monscat;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
+import java.util.Objects;
+
 public class MqttUtil {
     MemoryPersistence persistence = new MemoryPersistence();
 
     MqttClient client;
     MqttConnectOptions connOpts;
 
-    public boolean connectTo(String broker, String clientId, String topic) {
+    public boolean connectTo(String broker, String clientId, String username, String password) {
         try {
             client = new MqttClient(broker, clientId, persistence);
 
             connOpts = new MqttConnectOptions();
             connOpts.setCleanSession(true);
             connOpts.setAutomaticReconnect(true);
+            if(username != null && !username.isEmpty() && password != null && !password.isEmpty()){
+                connOpts.setUserName(username);
+                connOpts.setPassword(password.toCharArray());
+            }
 
             client.connect(connOpts);
 
+            return true;
+        } catch (MqttException me) {
+            printErrorLog(me);
+            return false;
+        }
+    }
+
+    public boolean subscribeTo(String topic) {
+        try {
             client.subscribe(topic, 2);
-
-            onMessage();
-
             return true;
         } catch (MqttException me) {
             printErrorLog(me);

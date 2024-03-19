@@ -7,6 +7,7 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
 
 public class Gui {
     // Main Gui
@@ -21,9 +22,17 @@ public class Gui {
     public JPanel clientIdPanel = new JPanel();
     public JLabel clientIdLabel = new JLabel("Client ID : ");
     public JTextField clientIdField = new JTextField(10);
+    public JPanel authPanel = new JPanel();
+    public JLabel usernameLabel = new JLabel("Username (Optional) : ");
+    public JTextField usernameField = new JTextField(10);
+    public JLabel passwordLabel = new JLabel("Password (Optional) : ");
+    public JPasswordField passwordField = new JPasswordField(10);
+    public DefaultListModel<String> subscribeList = new DefaultListModel<>();
+    public JList<String> subscribeJList = new JList<>(subscribeList);
     public JPanel subscribedTopicPanel = new JPanel();
     public JLabel subscribedTopicLabel = new JLabel("Subscribed Topic : ");
     public JTextField subscribedTopicField = new JTextField(10);
+    public JButton subscribeButton = new JButton("Subscribe");
     public JButton connectButton = new JButton("Connect");
     public JButton disconnectButton = new JButton("Disconnect");
 
@@ -72,35 +81,86 @@ public class Gui {
         clientIdPanel.add(clientIdLabel);
         clientIdPanel.add(clientIdField);
 
+        authPanel.setLayout(new BoxLayout(authPanel, BoxLayout.X_AXIS));
+        authPanel.add(usernameLabel);
+        authPanel.add(usernameField);
+        authPanel.add(passwordLabel);
+        authPanel.add(passwordField);
+
         subscribedTopicPanel.setLayout(new BoxLayout(subscribedTopicPanel, BoxLayout.X_AXIS));
         subscribedTopicField.setText("Topic 1");
         subscribedTopicPanel.add(subscribedTopicLabel);
         subscribedTopicPanel.add(subscribedTopicField);
 
+        subscribedTopicField.setEnabled(false);
+        subscribeButton.setEnabled(false);
+        subscribeButton.addActionListener(e -> {
+            String topic = subscribedTopicField.getText();
+            if (mqttUtil.subscribeTo(topic)) {
+                subscribeList.addElement(topic);
+                textArea.append("Subscribed to " + topic + "\n");
+            } else {
+                textArea.append("Failed to subscribe to " + topic + "\n");
+            }
+        });
+
+        subscribedTopicPanel.add(subscribeButton);
+
+        subscribeJList = new JList<>(subscribeList);
+        subscribeJList.setFixedCellWidth(150);
+
+        subscribeJList.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getClickCount() == 2) {
+                    int index = subscribeJList.locationToIndex(evt.getPoint());
+                    System.out.println("Double clicked on Item " + index);
+                    int option = JOptionPane.showConfirmDialog(frame,
+                            "Are you sure you want to remove this item?",
+                            "Unsubscribe " + subscribeJList.getSelectedValue(),
+                            JOptionPane.YES_NO_OPTION);
+                    if (option == JOptionPane.YES_OPTION) {
+                        textArea.append("Unsubscribed from " + subscribeJList.getSelectedValue() + "\n");
+                        subscribeList.remove(index);
+                    }
+                }
+            }
+        });
+        subscribedTopicPanel.add(subscribeJList);
+
         connectButton.addActionListener(e -> {
             connectButton.setEnabled(false);
             String broker = brokerField.getText();
             String clientId = clientIdField.getText();
-            String topic = subscribedTopicField.getText();
 
-            if (mqttUtil.connectTo(broker, clientId, topic)) {
+            if (mqttUtil.connectTo(broker, clientId, usernameField.getText(), new String(passwordField.getPassword()))) {
                 textArea.append("Successfully connected. \n");
                 textArea.append("Broker : " + broker + "\n");
                 textArea.append("Client ID : " + clientId + "\n");
-                textArea.append("Subscribed to : " + topic + "\n");
+                if (usernameField.getText() != null && !usernameField.getText().isEmpty() && passwordField.getPassword() != null && passwordField.getPassword().length > 0) {
+                    textArea.append("Username : " + usernameField.getText() + "\n");
+                    textArea.append("Password : " + new String(passwordField.getPassword()) + "\n");
+                }
+                if (!subscribeList.isEmpty()) {
+                    for (int i = 0; i < subscribeList.size(); i++) {
+                        mqttUtil.subscribeTo(subscribeList.get(i));
+                    }
+                }
                 textArea.append("Listening for messages...\n");
                 brokerField.setEnabled(false);
                 clientIdField.setEnabled(false);
-                subscribedTopicField.setEnabled(false);
                 connectButton.setEnabled(true);
                 connectButton.setVisible(false);
                 disconnectButton.setVisible(true);
+                subscribedTopicField.setEnabled(true);
+                subscribeButton.setEnabled(true);
 
                 handleMessages();
             } else {
                 connectButton.setEnabled(true);
                 connectButton.setVisible(true);
                 disconnectButton.setVisible(false);
+                subscribedTopicField.setEnabled(false);
+                subscribeButton.setEnabled(false);
                 textArea.append("Failed to connect to " + broker + "\n");
             }
         });
@@ -123,6 +183,7 @@ public class Gui {
 
         brokerForm.add(brokerPanel);
         brokerForm.add(clientIdPanel);
+        brokerForm.add(authPanel);
         brokerForm.add(subscribedTopicPanel);
         brokerForm.add(connectButton);
         brokerForm.add(disconnectButton);
@@ -130,7 +191,7 @@ public class Gui {
         return brokerForm;
     }
 
-    public void handleMessages(){
+    public void handleMessages() {
         mqttUtil.client.setCallback(new MqttCallback() {
             @Override
             public void connectionLost(Throwable cause) {
@@ -139,14 +200,12 @@ public class Gui {
 
             @Override
             public void messageArrived(String s, MqttMessage mqttMessage) throws Exception {
-                textArea.append("Message arrived. \n");
-                textArea.append("Topic : " + s + "\n");
-                textArea.append("Message : " + mqttMessage.toString() + "\n");
+                textArea.append("[" + s + "] : ");
+                textArea.append(mqttMessage.toString() + "\n");
             }
 
             @Override
             public void deliveryComplete(IMqttDeliveryToken token) {
-                textArea.append("Delivery complete. \n");
             }
         });
     }
@@ -175,9 +234,7 @@ public class Gui {
 
             if (mqttUtil.publishMessage(topic, message)) {
                 messageField.setText("");
-                textArea.append("Message sent. \n");
-                textArea.append("Topic : " + topic + "\n");
-                textArea.append("Message : " + message + "\n");
+                textArea.append("[" + clientIdField.getText() + "->" + topic + "] : " + message + "\n");
             } else {
                 textArea.append("Failed to send message. \n");
             }
