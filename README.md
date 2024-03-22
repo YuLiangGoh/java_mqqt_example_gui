@@ -7,8 +7,13 @@ Just run main.java and it should work! Its just that simple.
 
 Screenshot of UI:
 
-![Example 1](asset/image_1.png)
-![Example 2](asset/image_2.png)
+
+<img src="asset/image_1.png" alt="drawing" width="70%"/>
+<img src="asset/image_2.png" alt="drawing" width="70%"/>
+
+<br>
+
+**\* To create your own MQTT Broker, navigate to [mqtt_docker_broker](https://github.com/YuLiangGoh/mqtt_docker_broker) for more information.**
 
 ## Built With
 
